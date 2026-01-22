@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  linux:
+    runs-on: [self-hosted]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # Start a long-lived container from the *local* image
+      - name: Start vibetensor-ci container
+        run: |
+          docker rm -f vibetensor-ci-ci || true
+          docker run -d --gpus all \
+            --user "$(id -u):$(id -g)" \
+            --name vibetensor-ci-ci \
+            -e HOME=/workspace \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            vibetensor-ci:latest \
+            tail -f /dev/null
+
+      - name: Editable install (Debug)
+        env:
+          CMAKE_BUILD_TYPE: Debug
+        run: |
+          docker exec \
+            -e CMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
+            vibetensor-ci-ci \
+            bash -lc 'python -m pip install -v -e .[test]'
+
+      - name: Run C++ tests
+        run: |
+          docker exec vibetensor-ci-ci \
+            bash -lc 'ctest --test-dir build-py -j"$(nproc)" --output-on-failure'
+
+      - name: Parity gate (import-only)
+        run: |
+          docker exec vibetensor-ci-ci \
+            bash -lc "python tools/check_api_parity.py --manifest api/manifest_import_only.json"
+
+      - name: Run Python tests
+        run: |
+          docker exec vibetensor-ci-ci \
+            bash -lc 'python -m pytest -q'
+
+      - name: Run JS package tests (Node overlay)
+        run: |
+          docker exec \
+            vibetensor-ci-ci \
+            bash -lc '. "$NVM_DIR/nvm.sh" && nvm use 22 && \
+              if [ ! -f js/vibetensor/vbt_napi.node ]; then \
+                echo "vbt_napi.node not found; skipping JS overlay tests (Node addon not built by editable install)."; \
+                exit 0; \
+              fi && \
+              export VBT_NODE_ADDON_PATH="$(pwd)/js/vibetensor/vbt_napi.node" && \
+              cd js/vibetensor && \
+              node --version && npm --version && npm ci && npm test'
+
+      - name: Build wheel (Release)
+        env:
+          CMAKE_BUILD_TYPE: Release
+        run: |
+          docker exec \
+            -e CMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE" \
+            vibetensor-ci-ci \
+            bash -lc 'python -m pip install -v -e .[test]'
+
+      # Clean up the container (but keep workspace files)
+      - name: Stop vibetensor-ci container
+        if: always()
+        run: |
+          docker rm -f vibetensor-ci-ci || true

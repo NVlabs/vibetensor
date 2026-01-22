@@ -1,0 +1,33 @@
+name: CUDA allocator TSAN nightly
+
+on:
+  schedule:
+    # Run once per day at 08:00 UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  cuda-allocator-tsan-nightly:
+    name: CUDA allocator TSAN nightly
+    runs-on: [self-hosted, linux, x64, cuda]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+      - name: Install build tools
+        run: |
+          python -m pip install -U pip build pytest
+      - name: Editable install with CUDA + TSAN (Debug)
+        env:
+          CMAKE_BUILD_TYPE: Debug
+          CMAKE_ARGS: "-DVBT_ENABLE_TSAN=ON"
+        run: |
+          python -m pip install -v -e .[test]
+      - name: Run TSAN smoke test for native CUDA allocator
+        run: |
+          set -euxo pipefail
+          ctest --test-dir build-py --output-on-failure -R vbt_cuda_allocator_tsan_smoke_test

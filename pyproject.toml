@@ -1,0 +1,62 @@
+[build-system]
+requires = [
+  "scikit-build-core>=0.9",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "vibetensor"
+version = "0.0.1"
+requires-python = ">=3.10"
+description = "VibeTensor: a fresh async-first PyTorch-compatible backend (M1 bootstrap)"
+readme = { text = "VibeTensor M1 bootstrap.", content-type = "text/markdown" }
+license = { text = "Apache-2.0" }
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: C++",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: POSIX :: Linux",
+]
+
+dependencies = [
+  # CuTeDSL (CUTLASS Python DSL) used for cute kernel compilation.
+  # Pulls in cuda-python and numpy transitively.
+  "nvidia-cutlass-dsl==4.3.4",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7",
+]
+
+[tool.scikit-build]
+build-dir = "build-py"
+
+[tool.scikit-build.wheel]
+packages = ["python/vibetensor"]
+exclude = [
+  "include/gtest/**",
+  "include/gmock/**",
+  "lib/pkgconfig/gtest*.pc",
+  "lib/pkgconfig/gmock*.pc",
+  "lib/cmake/GTest/**",
+  "lib/cmake/gmock/**",
+  "include/dlpack/**",
+  "lib/cmake/dlpack/**",
+]
+
+[tool.scikit-build.cmake.define]
+VBT_USE_CUDA = "ON"
+VBT_BUILD_TESTS = "ON"
+VBT_BUILD_NODE = "ON"
+
+[tool.pytest.ini_options]
+markers = [
+  "cuda: tests requiring CUDA device",
+]
+testpaths = [
+  "tests/py",
+]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*", "*Tests"]
+python_functions = ["test_*"]

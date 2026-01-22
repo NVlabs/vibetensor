@@ -1,0 +1,57 @@
+name: CUDA allocator Compute Sanitizer nightly
+
+on:
+  schedule:
+    # Run once per day at 08:30 UTC (slightly after TSAN job)
+    - cron: '30 8 * * *'
+  workflow_dispatch:
+
+jobs:
+  cuda-allocator-compute-sanitizer-nightly:
+    name: CUDA allocator Compute Sanitizer nightly
+    runs-on: [self-hosted, linux, x64, cuda]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: 'pip'
+          cache-dependency-path: pyproject.toml
+
+      - name: Install build tools
+        run: |
+          python -m pip install -U pip build pytest
+
+      - name: Editable install with CUDA (Debug)
+        env:
+          CMAKE_BUILD_TYPE: Debug
+        run: |
+          python -m pip install -v -e .[test]
+
+      - name: Run C++ graphs pool invariants under Compute Sanitizer memcheck
+        run: |
+          set -euxo pipefail
+          tools/ci/run_compute_sanitizer_allocator.sh --tool memcheck -- \
+            ctest --test-dir build-py --output-on-failure \
+              -R vbt_cuda_graphs_allocator_pool_invariants_test
+
+      - name: Run Python stats snapshot under Compute Sanitizer memcheck
+        run: |
+          set -euxo pipefail
+          tools/ci/run_compute_sanitizer_allocator.sh --tool memcheck -- \
+            python -m pytest -q tests/py/cuda_graphs/test_stats_snapshot.py
+
+      - name: Run Python workload parity under Compute Sanitizer racecheck
+        run: |
+          set -euxo pipefail
+          tools/ci/run_compute_sanitizer_allocator.sh --tool racecheck -- \
+            python -m pytest -q tests/py/cuda_graphs/test_workload_parity.py
+
+      - name: Upload Compute Sanitizer logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compute-sanitizer-logs
+          path: artifacts/compute-sanitizer

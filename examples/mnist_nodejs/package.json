@@ -1,0 +1,12 @@
+{
+  "name": "vibetorch-mnist-nodejs",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "vibetensor": "file:../../js/vibetensor"
+  },
+  "scripts": {
+    "train:mnist": "VBT_NODE_ADDON_PATH=\"$(pwd)/../../js/vibetensor/vbt_napi.node\" node ./train_mnist.mjs"
+  }
+}
+
