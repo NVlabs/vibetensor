@@ -110,7 +110,7 @@ def benchmark_quack(
             else:
                 # Cutlass doesn't have cuda module in this version
                 return None
-        except:
+        except Exception:
             return None
 
         from quack.topk import topk
