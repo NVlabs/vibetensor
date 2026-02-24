@@ -92,11 +92,11 @@ def _benchmark(
         baseline()
         try:
             triton_impl()
-        except:
+        except Exception:
             pass
         try:
             cutedsl_impl()
-        except:
+        except Exception:
             pass
 
     # --- Quack ---
@@ -177,7 +177,7 @@ def _benchmark(
                 .view(-1)
             )
             tri_diff = torch.max(torch.abs(ref - ours_tri)).item()
-        except:
+        except Exception:
             tri_diff = -1.0
 
         # CuTeDSL
